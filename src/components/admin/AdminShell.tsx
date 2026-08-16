@@ -866,7 +866,7 @@ function TransactionsTab({ selectedEventId, logAction }: { selectedEventId: stri
       </div>
       {items.length === 0 ? <EmptyState message="No transactions yet." /> : (
         <TableShell>
-          <thead><tr><Th>Voter</Th><Th>Phone</Th><Th>Contestant</Th><Th>Package</Th><Th>Method</Th><Th>Amount</Th><Th>Votes</Th><Th>Status</Th><Th>Date</Th><Th>Actions</Th></tr></thead>
+          <thead><tr><Th>Voter</Th><Th>Phone</Th><Th>Contestant</Th><Th>Package</Th><Th>Method</Th><Th>Reference</Th><Th>Amount</Th><Th>Votes</Th><Th>Status</Th><Th>Date</Th><Th>Actions</Th></tr></thead>
           <tbody>
             {items.map((txn) => (
               <tr key={txn.id} className="hover:bg-gray-50">
@@ -875,6 +875,7 @@ function TransactionsTab({ selectedEventId, logAction }: { selectedEventId: stri
                 <Td className="whitespace-nowrap">{txn.contestant?.name ?? '—'}</Td>
                 <Td className="text-xs">{txn.vote_package?.name ?? '—'}</Td>
                 <Td className="text-xs">{PAYMENT_METHOD_LABELS[txn.payment_method]}</Td>
+                <Td className="text-xs font-mono text-gold-700 font-bold">{txn.reference_code ?? txn.momo_reference ?? '—'}</Td>
                 <Td className="font-medium">{formatGHS(txn.amount)}</Td>
                 <Td className="font-bold text-forest-600">{txn.votes_purchased}</Td>
                 <Td><Badge text={PAYMENT_STATUS_LABELS[txn.payment_status]} className={PAYMENT_STATUS_COLORS[txn.payment_status]} /></Td>
@@ -1006,7 +1007,7 @@ function ReconciliationTab({ selectedEventId, logAction }: { selectedEventId: st
                 <Td className="font-medium">{formatGHS(txn.amount)}</Td>
                 <Td className="font-bold text-forest-600">{txn.votes_purchased}</Td>
                 <Td className="text-xs">{PAYMENT_METHOD_LABELS[txn.payment_method]}</Td>
-                <Td className="text-xs font-mono text-gray-500">{txn.momo_reference ?? '—'}</Td>
+                <Td className="text-xs font-mono text-gold-700 font-bold">{txn.reference_code ?? txn.momo_reference ?? '—'}</Td>
                 <Td>
                   {txn.reconciled
                     ? <Badge text="Yes" className="bg-forest-100 text-forest-700 border-forest-200" />

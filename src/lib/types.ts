@@ -64,6 +64,7 @@ export interface Transaction {
   votes_purchased: number;
   momo_reference: string | null;
   momo_number: string | null;
+  reference_code: string | null;
   reconciled: boolean;
   reconciled_at: string | null;
   created_at: string;
