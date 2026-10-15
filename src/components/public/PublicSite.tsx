@@ -193,7 +193,60 @@ export function PublicSite() {
         </div>
       </header>
 
-      {/* Paystack Payment Result Banner */}\n      {paystackResult && (\n        <div\n          className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4 animate-slide-down`}\n        >\n          <div\n            className={`rounded-xl shadow-2xl border-2 p-4 flex items-start gap-3 ${\n              paystackResult.status === 'verifying'\n                ? 'bg-white border-gold-200'\n                : paystackResult.status === 'success'\n                ? 'bg-forest-50 border-forest-200'\n                : 'bg-red-50 border-red-200'\n            }`}\n          >\n            {paystackResult.status === 'verifying' && (\n              <Loader2 className=\"h-5 w-5 text-gold-500 animate-spin flex-shrink-0 mt-0.5\" />\n            )}\n            {paystackResult.status === 'success' && (\n              <CheckCircle2 className=\"h-5 w-5 text-forest-600 flex-shrink-0 mt-0.5\" />\n            )}\n            {paystackResult.status === 'failed' && (\n              <AlertCircle className=\"h-5 w-5 text-red-600 flex-shrink-0 mt-0.5\" />\n            )}\n            <div className=\"flex-1\">\n              {paystackResult.status === 'verifying' && (\n                <p className=\"text-sm font-medium text-gray-900\">\n                  Verifying your payment{paystackResult.reference ? ` (${paystackResult.reference})` : ''}…\n                </p>\n              )}\n              {paystackResult.status === 'success' && (\n                <>\n                  <p className=\"text-sm font-bold text-forest-800\">Payment successful! Your votes have been applied.</p>\n                  <p className=\"text-xs text-forest-600 mt-0.5\">\n                    Reference: {paystackResult.reference}\n                  </p>\n                </>\n              )}\n              {paystackResult.status === 'failed' && (\n                <p className=\"text-sm font-medium text-red-800\">\n                  {paystackResult.message || 'Payment could not be verified.'}\n                </p>\n              )}\n            </div>\n            {paystackResult.status !== 'verifying' && (\n              <button\n                onClick={() => setPaystackResult(null)}\n                className=\"text-gray-400 hover:text-gray-600 flex-shrink-0\"\n              >\n                <X className=\"h-4 w-4\" />\n              </button>\n            )}\n          </div>\n        </div>\n      )}\n\n      {loading ? (
+      {/* Paystack Payment Result Banner */}
+      {paystackResult && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4 animate-slide-down">
+          <div
+            className={`rounded-xl shadow-2xl border-2 p-4 flex items-start gap-3 ${
+              paystackResult.status === 'verifying'
+                ? 'bg-white border-gold-200'
+                : paystackResult.status === 'success'
+                ? 'bg-forest-50 border-forest-200'
+                : 'bg-red-50 border-red-200'
+            }`}
+          >
+            {paystackResult.status === 'verifying' && (
+              <Loader2 className="h-5 w-5 text-gold-500 animate-spin flex-shrink-0 mt-0.5" />
+            )}
+            {paystackResult.status === 'success' && (
+              <CheckCircle2 className="h-5 w-5 text-forest-600 flex-shrink-0 mt-0.5" />
+            )}
+            {paystackResult.status === 'failed' && (
+              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1">
+              {paystackResult.status === 'verifying' && (
+                <p className="text-sm font-medium text-gray-900">
+                  Verifying your payment{paystackResult.reference ? ` (${paystackResult.reference})` : ''}…
+                </p>
+              )}
+              {paystackResult.status === 'success' && (
+                <>
+                  <p className="text-sm font-bold text-forest-800">Payment successful! Your votes have been applied.</p>
+                  <p className="text-xs text-forest-600 mt-0.5">
+                    Reference: {paystackResult.reference}
+                  </p>
+                </>
+              )}
+              {paystackResult.status === 'failed' && (
+                <p className="text-sm font-medium text-red-800">
+                  {paystackResult.message || 'Payment could not be verified.'}
+                </p>
+              )}
+            </div>
+            {paystackResult.status !== 'verifying' && (
+              <button
+                onClick={() => setPaystackResult(null)}
+                className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {loading ? (
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse">
             <div className="w-12 h-12 border-4 border-gold-200 border-t-gold-500 rounded-full animate-spin mx-auto" />
