@@ -47,7 +47,8 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   mtn_momo: 'MTN MoMo',
   telecel_cash: 'Telecel Cash',
   atmoney: 'ATMoney',
-  physical_cash: 'Physical Cash',
+  physical_cash: 'Cash',
+  paystack: 'Card / MoMo (Paystack)',
 };
 
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {

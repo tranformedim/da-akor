@@ -48,7 +48,7 @@ export interface VotePackage {
   created_at: string;
 }
 
-export type PaymentMethod = 'mtn_momo' | 'telecel_cash' | 'atmoney' | 'physical_cash';
+export type PaymentMethod = 'mtn_momo' | 'telecel_cash' | 'atmoney' | 'physical_cash' | 'paystack';
 export type PaymentStatus = 'pending' | 'confirmed' | 'failed' | 'refunded';
 
 export interface Transaction {

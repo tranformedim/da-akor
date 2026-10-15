@@ -22,6 +22,8 @@ import {
   Facebook,
   Menu,
   X,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { formatGHS, formatNumber, formatDate, PAYMENT_METHOD_LABELS, timeAgo } from '@/lib/utils';
 
@@ -39,6 +41,46 @@ export function PublicSite() {
   const [eventDropdownOpen, setEventDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [paystackResult, setPaystackResult] = useState<
+    { status: 'verifying' | 'success' | 'failed'; reference?: string; message?: string } | null
+  >(null);
+
+  // Handle Paystack redirect callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paystackRef = params.get('paystack_ref');
+    if (!paystackRef) return;
+
+    setPaystackResult({ status: 'verifying', reference: paystackRef });
+
+    // Clean the URL
+    const cleanUrl = window.location.pathname + window.location.hash;
+    window.history.replaceState({}, document.title, cleanUrl);
+
+    const verifyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/paystack-verify?reference=${encodeURIComponent(paystackRef)}`;
+    fetch(verifyUrl, {
+      headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (data.status === 'success') {
+          setPaystackResult({ status: 'success', reference: paystackRef });
+        } else {
+          setPaystackResult({
+            status: 'failed',
+            reference: paystackRef,
+            message: data.message || data.error || 'Payment verification failed',
+          });
+        }
+      })
+      .catch(() => {
+        setPaystackResult({
+          status: 'failed',
+          reference: paystackRef,
+          message: 'Could not verify payment. If you paid, your votes will appear once confirmed.',
+        });
+      });
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -151,7 +193,7 @@ export function PublicSite() {
         </div>
       </header>
 
-      {loading ? (
+      {/* Paystack Payment Result Banner */}\n      {paystackResult && (\n        <div\n          className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4 animate-slide-down`}\n        >\n          <div\n            className={`rounded-xl shadow-2xl border-2 p-4 flex items-start gap-3 ${\n              paystackResult.status === 'verifying'\n                ? 'bg-white border-gold-200'\n                : paystackResult.status === 'success'\n                ? 'bg-forest-50 border-forest-200'\n                : 'bg-red-50 border-red-200'\n            }`}\n          >\n            {paystackResult.status === 'verifying' && (\n              <Loader2 className=\"h-5 w-5 text-gold-500 animate-spin flex-shrink-0 mt-0.5\" />\n            )}\n            {paystackResult.status === 'success' && (\n              <CheckCircle2 className=\"h-5 w-5 text-forest-600 flex-shrink-0 mt-0.5\" />\n            )}\n            {paystackResult.status === 'failed' && (\n              <AlertCircle className=\"h-5 w-5 text-red-600 flex-shrink-0 mt-0.5\" />\n            )}\n            <div className=\"flex-1\">\n              {paystackResult.status === 'verifying' && (\n                <p className=\"text-sm font-medium text-gray-900\">\n                  Verifying your payment{paystackResult.reference ? ` (${paystackResult.reference})` : ''}…\n                </p>\n              )}\n              {paystackResult.status === 'success' && (\n                <>\n                  <p className=\"text-sm font-bold text-forest-800\">Payment successful! Your votes have been applied.</p>\n                  <p className=\"text-xs text-forest-600 mt-0.5\">\n                    Reference: {paystackResult.reference}\n                  </p>\n                </>\n              )}\n              {paystackResult.status === 'failed' && (\n                <p className=\"text-sm font-medium text-red-800\">\n                  {paystackResult.message || 'Payment could not be verified.'}\n                </p>\n              )}\n            </div>\n            {paystackResult.status !== 'verifying' && (\n              <button\n                onClick={() => setPaystackResult(null)}\n                className=\"text-gray-400 hover:text-gray-600 flex-shrink-0\"\n              >\n                <X className=\"h-4 w-4\" />\n              </button>\n            )}\n          </div>\n        </div>\n      )}\n\n      {loading ? (
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse">
             <div className="w-12 h-12 border-4 border-gold-200 border-t-gold-500 rounded-full animate-spin mx-auto" />
@@ -177,8 +219,8 @@ export function PublicSite() {
                   <span className="block text-gold-400">talent & performers</span>
                 </h1>
                 <p className="mt-6 text-lg text-gray-300 max-w-2xl mx-auto">
-                  Transparent, auditable voting for events across Ghana. Pay with MTN MoMo, Telecel Cash, ATMoney, or
-                  cash — every vote is tracked and verified.
+                  Transparent, auditable voting for events across Ghana. Pay online with card or mobile money via
+                  Paystack, or pay manually via MTN MoMo, Telecel Cash, or cash — every vote is tracked and verified.
                 </p>
 
                 {/* Event Selector */}

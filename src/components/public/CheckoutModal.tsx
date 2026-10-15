@@ -8,6 +8,7 @@ import {
   Loader2,
   Smartphone,
   Banknote,
+  CreditCard,
   ArrowRight,
   ArrowLeft,
   Plus,
@@ -18,6 +19,7 @@ import {
   Phone,
   User,
   ShoppingCart,
+  Zap,
 } from 'lucide-react';
 
 interface CheckoutModalProps {
@@ -28,7 +30,7 @@ interface CheckoutModalProps {
   onSuccess: () => void;
 }
 
-type Step = 'package' | 'details' | 'payment' | 'processing' | 'instructions';
+type Step = 'package' | 'details' | 'payment' | 'processing' | 'instructions' | 'paystack_redirect';
 
 interface CartItem {
   pkg: VotePackage;
@@ -52,7 +54,8 @@ export function CheckoutModal({ event, contestant, packages, onClose, onSuccess 
   const [cart, setCart] = useState<Record<string, CartItem>>({});
   const [voterName, setVoterName] = useState('');
   const [voterPhone, setVoterPhone] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('mtn_momo');
+  const [voterEmail, setVoterEmail] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('paystack');
   const [error, setError] = useState('');
   const [referenceCode, setReferenceCode] = useState('');
   const [copied, setCopied] = useState(false);
@@ -104,6 +107,10 @@ export function CheckoutModal({ event, contestant, packages, onClose, onSuccess 
       setError('Please fill in all fields');
       return;
     }
+    if (paymentMethod === 'paystack' && !voterEmail.trim()) {
+      setError('Email is required for Paystack payments');
+      return;
+    }
     setError('');
     setStep('payment');
   };
@@ -116,7 +123,6 @@ export function CheckoutModal({ event, contestant, packages, onClose, onSuccess 
 
     const ref = generateReferenceCode();
 
-    // Create one transaction per cart item, all sharing the same reference code
     const inserts = cartItems.map((item) => ({
       event_id: event.id,
       contestant_id: contestant.id,
@@ -141,6 +147,43 @@ export function CheckoutModal({ event, contestant, packages, onClose, onSuccess 
     }
 
     setReferenceCode(ref);
+
+    if (paymentMethod === 'paystack') {
+      // Initialize Paystack transaction and redirect
+      try {
+        const callbackUrl = `${window.location.origin}/?paystack_ref=${ref}`;
+        const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/paystack-initialize`;
+        const response = await fetch(functionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            reference_code: ref,
+            amount: totalAmount,
+            email: voterEmail.trim(),
+            voter_name: voterName.trim(),
+            callback_url: callbackUrl,
+          }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Failed to initialize payment');
+        }
+
+        const data = await response.json();
+        // Redirect to Paystack payment page
+        window.location.href = data.authorization_url;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to start Paystack payment');
+        setStep('payment');
+      }
+      return;
+    }
+
+    // Manual payment flow
     setTimeout(() => setStep('instructions'), 1000);
   };
 
@@ -150,7 +193,8 @@ export function CheckoutModal({ event, contestant, packages, onClose, onSuccess 
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const paymentMethods: { value: PaymentMethod; label: string; icon: typeof Smartphone }[] = [
+  const manualPaymentMethods: { value: PaymentMethod; label: string; icon: typeof Smartphone }[] = [
+    { value: 'paystack', label: 'Card / MoMo (Online)', icon: CreditCard },
     { value: 'mtn_momo', label: 'MTN MoMo', icon: Smartphone },
     { value: 'telecel_cash', label: 'Telecel Cash', icon: Smartphone },
     { value: 'atmoney', label: 'ATMoney', icon: Smartphone },
@@ -178,7 +222,7 @@ export function CheckoutModal({ event, contestant, packages, onClose, onSuccess 
 
         <div className="p-6">
           {/* Step indicator */}
-          {step !== 'processing' && step !== 'instructions' && (
+          {step !== 'processing' && step !== 'instructions' && step !== 'paystack_redirect' && (
             <div className="flex items-center gap-2 mb-6">
               {['package', 'details', 'payment'].map((s, i) => {
                 const stepNum = i + 1;
@@ -363,6 +407,19 @@ export function CheckoutModal({ event, contestant, packages, onClose, onSuccess 
                   />
                 </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Email {paymentMethod !== 'paystack' && <span className="text-gray-400">(required for online payment)</span>}
+                </label>
+                <input
+                  type="email"
+                  value={voterEmail}
+                  onChange={(e) => setVoterEmail(e.target.value)}
+                  placeholder="e.g. your@email.com"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-gold-400 focus:ring-2 focus:ring-gold-100 outline-none transition-all"
+                  required={paymentMethod === 'paystack'}
+                />
+              </div>
 
               {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -389,29 +446,50 @@ export function CheckoutModal({ event, contestant, packages, onClose, onSuccess 
             <form onSubmit={handlePaymentSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {paymentMethods.map((m) => {
+                <div className="space-y-2">
+                  {manualPaymentMethods.map((m) => {
                     const Icon = m.icon;
+                    const isPaystack = m.value === 'paystack';
                     return (
                       <button
                         key={m.value}
                         type="button"
                         onClick={() => setPaymentMethod(m.value)}
-                        className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all text-sm font-medium ${
+                        className={`w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-sm font-medium ${
                           paymentMethod === m.value
                             ? 'border-gold-400 bg-gold-50 text-gray-900'
                             : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                        }`}
+                        } ${isPaystack ? 'relative' : ''}`}
                       >
-                        <Icon className="h-4 w-4" />
-                        {m.label}
+                        <Icon className={`h-5 w-5 ${isPaystack ? 'text-gold-500' : ''}`} />
+                        <div className="flex-1 text-left">
+                          <span>{m.label}</span>
+                          {isPaystack && (
+                            <span className="block text-xs text-gray-500 mt-0.5">
+                              Instant — card, mobile money, or bank transfer via Paystack
+                            </span>
+                          )}
+                        </div>
+                        {isPaystack && (
+                          <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-forest-500 text-white rounded-full">
+                            <Zap className="h-2.5 w-2.5" /> Instant
+                          </span>
+                        )}
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {paymentMethod !== 'physical_cash' ? (
+              {paymentMethod === 'paystack' ? (
+                <div className="bg-forest-50 border border-forest-100 rounded-xl p-4">
+                  <p className="text-sm text-forest-800">
+                    You'll be redirected to Paystack's secure payment page to complete your payment of{' '}
+                    {formatGHS(totalAmount)}. Your votes will be applied instantly after payment — no admin
+                    confirmation needed.
+                  </p>
+                </div>
+              ) : paymentMethod !== 'physical_cash' ? (
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
                   <p className="text-sm text-blue-800">
                     You will send {formatGHS(totalAmount)} via {PAYMENT_METHOD_LABELS[paymentMethod]} to the number
@@ -456,7 +534,9 @@ export function CheckoutModal({ event, contestant, packages, onClose, onSuccess 
                   type="submit"
                   className="flex-1 px-4 py-2.5 rounded-xl bg-forest-600 text-white font-semibold hover:bg-forest-700 transition-colors"
                 >
-                  Get Payment Instructions
+                  {paymentMethod === 'paystack'
+                    ? `Pay ${formatGHS(totalAmount)} Online`
+                    : 'Get Payment Instructions'}
                 </button>
               </div>
             </form>
@@ -466,12 +546,18 @@ export function CheckoutModal({ event, contestant, packages, onClose, onSuccess 
           {step === 'processing' && (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="h-12 w-12 text-gold-500 animate-spin mb-4" />
-              <h3 className="font-display text-lg font-bold text-gray-900">Generating your reference code…</h3>
-              <p className="text-sm text-gray-500 mt-1">Preparing your payment instructions.</p>
+              <h3 className="font-display text-lg font-bold text-gray-900">
+                {paymentMethod === 'paystack' ? 'Redirecting to Paystack…' : 'Generating your reference code…'}
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {paymentMethod === 'paystack'
+                  ? 'Taking you to the secure payment page.'
+                  : 'Preparing your payment instructions.'}
+              </p>
             </div>
           )}
 
-          {/* Step: Payment Instructions */}
+          {/* Step: Payment Instructions (manual only) */}
           {step === 'instructions' && (
             <div className="space-y-5">
               {/* Success header */}
