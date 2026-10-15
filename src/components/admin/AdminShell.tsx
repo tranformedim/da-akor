@@ -16,11 +16,12 @@ import {
   TrendingUp, Vote as VoteIcon, DollarSign, CheckCircle2, AlertCircle,
   Plus, Pencil, Trash2, Download, Copy, RefreshCw, Eye, EyeOff,
   Search, Loader2, ArrowLeft, Sparkles, KeyRound, Ban, RotateCcw,
+  Settings, Trash, Rocket, AlertTriangle,
 } from 'lucide-react';
 
 type Tab =
   | 'overview' | 'events' | 'categories' | 'contestants' | 'packages'
-  | 'transactions' | 'batches' | 'reconciliation' | 'audit' | 'admins';
+  | 'transactions' | 'batches' | 'reconciliation' | 'audit' | 'admins' | 'settings';
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -33,6 +34,7 @@ const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'reconciliation', label: 'Reconciliation', icon: ShieldCheck },
   { id: 'audit', label: 'Audit Log', icon: ScrollText },
   { id: 'admins', label: 'Admins', icon: UserCog },
+  { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
 interface AdminShellProps {
@@ -144,7 +146,7 @@ export function AdminShell({ admin, onLogout }: AdminShellProps) {
           </div>
 
           {/* Event filter */}
-          {activeTab !== 'overview' && activeTab !== 'admins' && activeTab !== 'audit' && events.length > 0 && (
+          {activeTab !== 'overview' && activeTab !== 'admins' && activeTab !== 'audit' && activeTab !== 'settings' && events.length > 0 && (
             <select
               value={selectedEventId}
               onChange={(e) => setSelectedEventId(e.target.value)}
@@ -170,6 +172,7 @@ export function AdminShell({ admin, onLogout }: AdminShellProps) {
           {activeTab === 'reconciliation' && <ReconciliationTab selectedEventId={selectedEventId} logAction={logAction} />}
           {activeTab === 'audit' && <AuditTab />}
           {activeTab === 'admins' && <AdminsTab admin={admin} />}
+          {activeTab === 'settings' && <SettingsTab admin={admin} logAction={logAction} />}
         </main>
       </div>
     </div>
@@ -428,7 +431,7 @@ function EventForm({ event, onClose, onSaved, logAction }: { event: Event | null
       start_date: startDate || null,
       end_date: endDate || null,
       slug,
-      is_sandbox: true,
+      is_sandbox: false,
     };
     if (event) {
       await supabase.from('events').update(payload).eq('id', event.id);
@@ -1172,6 +1175,202 @@ function AdminsTab({ admin }: { admin: Admin }) {
             </tbody>
           </TableShell>
         )}
+      </div>
+    </div>
+  );
+}
+
+// === Settings Tab ===
+function SettingsTab({ admin, logAction }: { admin: Admin; logAction: (a: string, et?: string, ei?: string, d?: Record<string, unknown>) => void }) {
+  const [clearing, setClearing] = useState(false);
+  const [goingLive, setGoingLive] = useState(false);
+  const [clearConfirm, setClearConfirm] = useState(false);
+  const [liveConfirm, setLiveConfirm] = useState(false);
+  const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const isSuperAdmin = admin.role === 'super_admin';
+
+  const handleClearData = async () => {
+    setClearing(true);
+    setResult(null);
+    try {
+      const { data, error } = await supabase.rpc('clear_test_data');
+      if (error) throw error;
+      const r = data as { batches_deleted: number; transactions_deleted: number };
+      setResult({ type: 'success', message: `Cleared ${r.transactions_deleted} transactions and ${r.batches_deleted} vote batches. All vote counts reset to zero.` });
+      logAction('clear_test_data', 'system', undefined, r);
+    } catch (err) {
+      setResult({ type: 'error', message: err instanceof Error ? err.message : 'Failed to clear test data' });
+    } finally {
+      setClearing(false);
+      setClearConfirm(false);
+    }
+  };
+
+  const handleGoLive = async () => {
+    setGoingLive(true);
+    setResult(null);
+    try {
+      const { data, error } = await supabase.rpc('go_live');
+      if (error) throw error;
+      const r = data as { events_updated: number };
+      setResult({ type: 'success', message: `Switched ${r.events_updated} event(s) to live mode. Sandbox badges removed from the public site.` });
+      logAction('go_live', 'system', undefined, r);
+    } catch (err) {
+      setResult({ type: 'error', message: err instanceof Error ? err.message : 'Failed to switch to live mode' });
+    } finally {
+      setGoingLive(false);
+      setLiveConfirm(false);
+    }
+  };
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-amber-800">Super admin access required</p>
+            <p className="text-sm text-amber-600 mt-1">Only super admins can access settings. Ask a super admin to perform these actions.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h3 className="font-display font-bold text-gray-900 mb-1">Platform Settings</h3>
+        <p className="text-sm text-gray-500">Manage test data and switch your platform to live mode.</p>
+      </div>
+
+      {result && (
+        <div className={`p-4 rounded-xl border flex items-start gap-3 animate-slide-down ${
+          result.type === 'success'
+            ? 'bg-forest-50 border-forest-200 text-forest-800'
+            : 'bg-red-50 border-red-200 text-red-800'
+        }`}>
+          {result.type === 'success'
+            ? <CheckCircle2 className="h-5 w-5 text-forest-600 flex-shrink-0 mt-0.5" />
+            : <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />}
+          <p className="text-sm font-medium">{result.message}</p>
+        </div>
+      )}
+
+      {/* Clear Test Data */}
+      <div className="bg-white rounded-xl border border-gray-100 p-5">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+            <Trash className="h-5 w-5 text-red-600" />
+          </div>
+          <div>
+            <h4 className="font-display font-bold text-gray-900">Clear All Test Data</h4>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Deletes all transactions and vote batches, resets all contestant vote counts and event totals to zero.
+              Events, contestants, categories, and vote packages are kept.
+            </p>
+          </div>
+        </div>
+        {!clearConfirm ? (
+          <button
+            onClick={() => setClearConfirm(true)}
+            className="px-4 py-2.5 rounded-lg bg-red-600 text-white font-medium text-sm hover:bg-red-700 transition-colors flex items-center gap-2"
+          >
+            <Trash className="h-4 w-4" /> Clear Test Data
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm font-bold text-red-800">Are you sure? This cannot be undone.</p>
+              <p className="text-xs text-red-600 mt-1">All transactions and vote batches will be permanently deleted.</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleClearData}
+                disabled={clearing}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white font-medium text-sm hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {clearing && <Loader2 className="h-4 w-4 animate-spin" />}
+                Yes, Delete Everything
+              </button>
+              <button
+                onClick={() => setClearConfirm(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Go Live */}
+      <div className="bg-white rounded-xl border border-gray-100 p-5">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 rounded-lg bg-forest-100 flex items-center justify-center flex-shrink-0">
+            <Rocket className="h-5 w-5 text-forest-600" />
+          </div>
+          <div>
+            <h4 className="font-display font-bold text-gray-900">Go Live</h4>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Removes the sandbox badge from all events and switches the platform to live mode.
+              New events created after this will still default to sandbox — set them to live individually in the Events tab.
+            </p>
+          </div>
+        </div>
+        {!liveConfirm ? (
+          <button
+            onClick={() => setLiveConfirm(true)}
+            className="px-4 py-2.5 rounded-lg bg-forest-600 text-white font-medium text-sm hover:bg-forest-700 transition-colors flex items-center gap-2"
+          >
+            <Rocket className="h-4 w-4" /> Switch to Live Mode
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <div className="p-3 bg-forest-50 border border-forest-200 rounded-lg">
+              <p className="text-sm font-bold text-forest-800">Ready to go live?</p>
+              <p className="text-xs text-forest-600 mt-1">All events will be marked as live. Make sure you've cleared test data first if needed.</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleGoLive}
+                disabled={goingLive}
+                className="px-4 py-2 rounded-lg bg-forest-600 text-white font-medium text-sm hover:bg-forest-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {goingLive && <Loader2 className="h-4 w-4 animate-spin" />}
+                Yes, Go Live
+              </button>
+              <button
+                onClick={() => setLiveConfirm(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Admin Account Info */}
+      <div className="bg-white rounded-xl border border-gray-100 p-5">
+        <h4 className="font-display font-bold text-gray-900 mb-3">Your Account</h4>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-500">Name</span>
+            <span className="font-medium text-gray-900">{admin.full_name}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Email</span>
+            <span className="font-medium text-gray-900">{admin.email}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Role</span>
+            <Badge text={admin.role} className={admin.role === 'super_admin' ? 'bg-gold-100 text-gold-700 border-gold-200' : 'bg-gray-100 text-gray-600 border-gray-200'} />
+          </div>
+        </div>
+        <p className="text-xs text-gray-400 mt-3">
+          To reset your password, use the "Forgot password?" link on the admin login page.
+        </p>
       </div>
     </div>
   );
