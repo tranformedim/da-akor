@@ -37,7 +37,7 @@ interface CartItem {
   quantity: number;
 }
 
-const MOMO_NUMBER = '0532750350';
+const MOMO_NUMBER = '+233 53 2750 350';
 const MOMO_ACCOUNT_NAME = 'Joy Selasi Sogbey';
 
 function generateReferenceCode(): string {

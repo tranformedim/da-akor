@@ -634,7 +634,7 @@ export function PublicSite() {
                 <div>
                   <h4 className="text-white font-medium mb-3">Contact</h4>
                   <div className="space-y-2 text-sm">
-                    <p className="flex items-center gap-2"><Phone className="h-4 w-4" /> +233 24 123 4567</p>
+                    <p className="flex items-center gap-2"><Phone className="h-4 w-4" /> +233 53 2750 350</p>
                     <p className="flex items-center gap-2"><Mail className="h-4 w-4" /> hello@daako.gh</p>
                   </div>
                 </div>
